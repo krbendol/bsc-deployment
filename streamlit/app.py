@@ -1,46 +1,46 @@
-import numpy as np
-import streamlit as st
-from PIL import Image, ImageOps
+from flask import Flask, send_from_directory, render_template, request, redirect, url_for
+from waitress import serve
+from src.utils import extract_feature_values
+from src.models.predictor import get_prediction
 
+app = Flask(__name__, static_url_path="/static")
 
-def import_and_predict(image_data, model):
+@app.route("/")
+def index():
+    """Return the main page."""
+    return send_from_directory("static", "index.html")
+
+@app.route("/make_prediction", methods=["POST"])
+def make_prediction():
+    """ Use the ML model to make a prediction using the form inputs. """
+
+    # Get the data from the submitted form
+    data = request.form
+    print(data) # Remove this when you're done debugging
+
+    # Convert the data into just a list of values to be sent to the model
+    feature_values = extract_feature_values(data)
+    print(feature_values) # Remove this when you're done debugging
+
+    # Send the values to the model to get a prediction
+    prediction = get_prediction(feature_values)
+
+    # Tell the browser to fetch the results page, passing along the prediction
+    return redirect(url_for("show_results", prediction=prediction))
+
+@app.route("/show_results")
+def show_results():
+    """ Display the results page with the provided prediction """
     
-        size = (256,256) 
-        image = ImageOps.fit(image_data, size, Image.ANTIALIAS)
-        image = image.convert('RGB')
-        image = np.asarray(image)
-        image = (image.astype(np.float32) / 256.0)
+    # Extract the prediction from the URL params
+    prediction = request.args.get("prediction")
 
-        img_reshape = image[np.newaxis,...]
+    # Round it for display purposes
+    prediction = round(float(prediction), 3)
 
-        prediction = model.predict(img_reshape)
-        
-        return prediction
-
-class Model:
-
-    def predict(self, X):
-        return 'We predict that you uploaded an image!'
-
-model = Model()
+    # Return the results pge
+    return render_template("results.html", prediction=prediction)
 
 
-st.write("""
-         # Image Predictor
-         """
-         )
-
-st.write("This is a simple image classification web app.")
-file = st.file_uploader("Please upload an image file", type=["jpg", "png"])
-#
-if file is None:
-    st.text("You haven't uploaded an image file")
-else:
-    image = Image.open(file)
-    st.image(image, use_column_width=True)
-    prediction = import_and_predict(image, model)
-    
-
-    st.write(prediction)
-
-    
+if __name__ == "__main__":
+    serve(app, host='0.0.0.0', port=5000)
